@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui" 
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+		mc:Ignorable="d" 
+		d:DesignWidth="800" d:DesignHeight="450"
+		x:Class="CinemaSeatBooking.MainWindow"
+		Title="CinemaSeatBooking">
+	<Grid>
+		<Image Source="C:\Users\hp\Documents\Material\PL3\images\Gemini_Generated_Image_bwlbbcbwlbbcbwlb.png" Stretch="UniformToFill" />
+		<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="15">
+			<TextBlock Text="Enter number of Rows:" Foreground="#800000" FontWeight="Bold"/>
+			<TextBox Name="RowsTextBox" Width="200"/>
+			<TextBlock Text="Enter number of Columns:" Foreground="#800000" FontWeight="Bold"/>
+			<TextBox Name="ColsTextBox" Width="200"/>
+			<Button Name="CreateButton" Content="Create" Width="100" Background="#FFEB99" Foreground="White" FontWeight="Bold"/>
+		</StackPanel>
+	</Grid>
+</Window>
