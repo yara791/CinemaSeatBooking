@@ -31,10 +31,7 @@ type MainWindow () as this =
         let successCols, cols = Int32.TryParse(colsInput.Text)
 
         if successRows && successCols then
-           let seatMapWindow = SeatMapWindow(rows, cols, SeatManagement.initializeSeatLayout rows cols)
-           seatMapWindow.Show()
-
-        else
-            printfn "Please enter valid numbers"
-
-
+            
+            let seatMapWindow = SeatMapWindow(rows, cols)
+            seatMapWindow.Show()
+        
