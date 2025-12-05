@@ -17,6 +17,7 @@ type Seat = {
 // التيكت
 type Ticket = { 
     Id: Guid
+    GridId: string  // Special ID representing the grid configuration (e.g., "5x10")
     Seats: Seat list
     CreatedAt: DateTime 
 }

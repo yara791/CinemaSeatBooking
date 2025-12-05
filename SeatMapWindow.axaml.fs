@@ -1,12 +1,14 @@
 ﻿namespace CinemaSeatBooking
 
 open System
+open System.IO
 open Avalonia
 open Avalonia.Controls
 open Avalonia.Markup.Xaml
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia.Media.Imaging
+open Avalonia.Platform
 open CinemaSeatBooking.SeatManagement
 open CinemaSeatBooking.BookingLogic
 
@@ -15,6 +17,9 @@ open CinemaSeatBooking.BookingLogic
 
 type SeatMapWindow(rows: int, cols: int) as this =
     inherit Window()
+
+    // ===== Grid Configuration ID =====
+    let gridId = sprintf "%dx%d" rows cols  // e.g., "5x10" for 5 rows and 10 columns
 
     // ===== عناصر الواجهة الرسومية =====
     let mutable seatsPanel : StackPanel = null          // لعرض خريطة الكراسي
@@ -28,6 +33,15 @@ type SeatMapWindow(rows: int, cols: int) as this =
     // ===== الحالة الداخلية للسينما =====
     let mutable cinemaState: CinemaState = 
         { Seats = SeatManagement.initializeSeatLayout rows cols; Tickets = [] } // initializeSeatLayout بترجع كل الكراسي كـ Available
+
+    // ===== Dynamic seat refresh timer =====
+    let mutable refreshTimer: System.Timers.Timer = null
+    let mutable lastUpdateTime = DateTime.Now
+    let mutable previousSeats: Seat list = []
+    let mutable recentlyChangedSeats: Set<int * int> = Set.empty
+    
+    // ===== File System Watcher for instant updates =====
+    let mutable fileWatcher: FileSystemWatcher = null
 
     do
         // ===== تحميل XAML وربط عناصر الواجهة =====
@@ -43,31 +57,226 @@ type SeatMapWindow(rows: int, cols: int) as this =
         ticketsButton.IsVisible <- false // في البداية زرار التيكت مخفي
         seatsPanel.HorizontalAlignment <- HorizontalAlignment.Left
 
+        // ===== Load existing tickets from file and restore state =====
+        this.LoadTicketsFromFile()
+
         // ===== عرض الكراسي عند فتح البرنامج =====
         this.GenerateSeats()
+
+        // ===== Setup dynamic seat refresh timer =====
+        this.SetupDynamicRefresh()
 
         // ===== ربط الأحداث بالزرار =====
         generateButton.Click.Add(fun _ -> this.GenerateSeatInputs() |> ignore)
         reserveButton.Click.Add(fun _ -> this.ReserveSeatsFromInputs() |> ignore)
         ticketsButton.Click.Add(fun _ -> this.ShowTicketsPage() |> ignore)
+        
+        // ===== Cleanup on window closing =====
+        this.Closing.Add(fun _ -> this.Cleanup())
+
+    // ===== Setup dynamic refresh timer =====
+    member private this.SetupDynamicRefresh() =
+        // ===== Setup periodic timer (backup mechanism) =====
+        refreshTimer <- new System.Timers.Timer(5000.0) // Refresh every 5 seconds
+        refreshTimer.Elapsed.Add(fun _ ->
+            Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                this.RefreshSeatsDisplay()
+            )
+        )
+        refreshTimer.Start()
+        
+        // ===== Setup File System Watcher for instant updates =====
+        this.SetupFileWatcher()
+    
+    member private this.SetupFileWatcher() =
+        try
+            let path = "Tickets.txt"
+            let directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))
+            let fileName = System.IO.Path.GetFileName(path)
+            
+            fileWatcher <- new FileSystemWatcher(directory, fileName)
+            fileWatcher.NotifyFilter <- NotifyFilters.LastWrite ||| NotifyFilters.Size
+            fileWatcher.EnableRaisingEvents <- true
+            
+            // Handle file changes
+            fileWatcher.Changed.Add(fun _ ->
+                // Small delay to ensure file write is complete
+                System.Threading.Thread.Sleep(100)
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    this.RefreshSeatsDisplay()
+                )
+            )
+        with ex ->
+            // If file watcher fails, fallback to timer-based refresh
+            statusMessage.Text <- sprintf "File watcher setup failed, using timer-based refresh: %s" ex.Message
+
+    // ===== Refresh seats display dynamically =====
+    member private this.RefreshSeatsDisplay() =
+        // ===== إعادة تحميل الحالة من الملف للتزامن مع النوافذ الأخرى =====
+        this.LoadTicketsFromFile()
+        
+        // Detect seat changes
+        let changes = 
+            cinemaState.Seats 
+            |> List.filter (fun seat ->
+                match previousSeats |> List.tryFind (fun s -> s.Row = seat.Row && s.Col = seat.Col) with
+                | Some prevSeat -> prevSeat.Status <> seat.Status
+                | None -> false)
+            |> List.map (fun s -> (s.Row, s.Col))
+            |> Set.ofList
+        
+        if not changes.IsEmpty then
+            recentlyChangedSeats <- changes
+            previousSeats <- cinemaState.Seats
+            this.GenerateSeats()
+            // Clear highlight after 3 seconds
+            System.Threading.Tasks.Task.Delay(3000).ContinueWith(fun _ ->
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    recentlyChangedSeats <- Set.empty
+                    this.GenerateSeats()
+                )
+            ) |> ignore
+        
+        // Check if there were any changes (simulate checking for external updates)
+        let currentTime = DateTime.Now
+        if (currentTime - lastUpdateTime).TotalSeconds >= 5.0 then
+            lastUpdateTime <- currentTime
+    
+    // ===== Cleanup resources =====
+    member private this.Cleanup() =
+        if refreshTimer <> null then
+            refreshTimer.Stop()
+            refreshTimer.Dispose()
+        if fileWatcher <> null then
+            fileWatcher.EnableRaisingEvents <- false
+            fileWatcher.Dispose()
 
     // ===== تحميل XAML =====
     member private this.InitializeComponent() =
         AvaloniaXamlLoader.Load(this)
 
+    // ===== حفظ التيكتات في الملف - دالة مساعدة =====
+    member private this.SaveTicketsToFile() =
+        try
+            let path = "Tickets.txt"
+            use writer = new StreamWriter(path)
+            cinemaState.Tickets |> List.iter (fun ticket ->
+                writer.WriteLine(sprintf "Grid ID: %s | Ticket ID: %A | Created At: %s" ticket.GridId ticket.Id (ticket.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")))
+                ticket.Seats |> List.iter (fun s ->
+                    writer.WriteLine(sprintf "Seat: Row %d, Col %d" s.Row s.Col)
+                )
+                writer.WriteLine("--------------------------------------------------")
+            )
+            true
+        with ex ->
+            statusMessage.Text <- sprintf "Error saving tickets to file: %s" ex.Message
+            false
+
+    // ===== تحميل التيكتات من الملف عند بدء التطبيق =====
+    member private this.LoadTicketsFromFile() =
+        try
+            let path = "Tickets.txt"
+            if System.IO.File.Exists(path) then
+                let lines = System.IO.File.ReadAllLines(path) |> Array.toList
+                let mutable reservedPositions = Set.empty<int * int>
+                
+                let rec parseTickets (lines: string list) (acc: Ticket list) =
+                    match lines with
+                    | [] -> List.rev acc
+                    | line :: rest ->
+                        if line.StartsWith("Grid ID:") then
+                            // Parse Grid ID, Ticket ID and timestamp
+                            let parts = line.Split('|')
+                            let ticketGridId = parts.[0].Replace("Grid ID:", "").Trim()
+                            let idPart = parts.[1].Replace("Ticket ID:", "").Trim()
+                            let ticketId = Guid.Parse(idPart)
+                            let datePart = parts.[2].Replace("Created At:", "").Trim()
+                            let createdAt = DateTime.Parse(datePart)
+                            
+                            // Only load tickets that match the current grid configuration
+                            if ticketGridId = gridId then
+                                // Parse seats for this ticket
+                                let rec parseSeats (remaining: string list) (seats: Seat list) =
+                                    match remaining with
+                                    | seatLine :: rest when seatLine.StartsWith("Seat:") ->
+                                        // Parse "Seat: Row X, Col Y"
+                                        let seatParts = seatLine.Replace("Seat:", "").Split(',')
+                                        let row = seatParts.[0].Replace("Row", "").Trim() |> int
+                                        let col = seatParts.[1].Replace("Col", "").Trim() |> int
+                                        
+                                        // Track this position as reserved
+                                        reservedPositions <- reservedPositions.Add((row, col))
+                                        
+                                        // Create seat object with Reserved status
+                                        let seat = { Row = row; Col = col; Status = SeatStatus.Reserved }
+                                        parseSeats rest (seat :: seats)
+                                    | _ :: rest -> (List.rev seats, rest)
+                                    | [] -> (List.rev seats, [])
+                                
+                                let (seats, remaining) = parseSeats rest []
+                                let ticket = { Id = ticketId; GridId = ticketGridId; Seats = seats; CreatedAt = createdAt }
+                                parseTickets remaining (ticket :: acc)
+                            else
+                                // Skip tickets from different grid configurations
+                                let rec skipToNextTicket (remaining: string list) =
+                                    match remaining with
+                                    | line :: rest when line.StartsWith("--------------------------------------------------") -> rest
+                                    | _ :: rest -> skipToNextTicket rest
+                                    | [] -> []
+                                parseTickets (skipToNextTicket rest) acc
+                        else
+                            parseTickets rest acc
+                
+                let loadedTickets = parseTickets lines []
+                
+                // Update seats based on reserved positions
+                // Mark seats as Reserved if in file, or Available if not
+                let updatedSeats = 
+                    cinemaState.Seats 
+                    |> List.map (fun seat ->
+                        if reservedPositions.Contains((seat.Row, seat.Col)) then
+                            { seat with Status = SeatStatus.Reserved }
+                        else
+                            { seat with Status = SeatStatus.Available }  // Ensure freed seats are marked available
+                    )
+                
+                // Reconstruct cinemaState with loaded data
+                cinemaState <- { Seats = updatedSeats; Tickets = loadedTickets }
+                statusMessage.Text <- sprintf "Loaded %d tickets for grid %s" (loadedTickets.Length) gridId
+            else
+                statusMessage.Text <- "No tickets file found - starting fresh"
+        with ex ->
+            statusMessage.Text <- sprintf "Error loading tickets from file: %s" ex.Message
+
     // ===== إنشاء خلية كرسي واحدة مع اللون والرمز =====
     member private this.CreateSeatCell(seat: Seat) =
         let border = new Border(Width=60.0, Height=60.0, CornerRadius=CornerRadius(5.0), Margin=Thickness(5.0))
         let text = new TextBlock(HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center, FontSize=20.0)
+        
+        // Check if this seat recently changed
+        let isRecentlyChanged = recentlyChangedSeats.Contains((seat.Row, seat.Col))
+        
         match seat.Status with
         | SeatStatus.Available -> 
-            border.Background <- SolidColorBrush(Color.Parse("#FFEB99"))
+            border.Background <- if isRecentlyChanged then 
+                                    SolidColorBrush(Color.Parse("#90EE90")) // Light green for recently freed
+                                 else 
+                                    SolidColorBrush(Color.Parse("#FFEB99"))
             text.Foreground <- Brushes.White
             text.Text <- "O"   // كرسي متاح
         | SeatStatus.Reserved -> 
-            border.Background <- Brushes.Red
+            border.Background <- if isRecentlyChanged then
+                                    SolidColorBrush(Color.Parse("#FF6B6B")) // Bright red for recently reserved
+                                 else
+                                    SolidColorBrush(Color.Parse("#DC143C")) // Crimson red
             text.Foreground <- Brushes.White
             text.Text <- "X"   // كرسي محجوز
+        
+        // Add border for recently changed seats
+        if isRecentlyChanged then
+            border.BorderBrush <- Brushes.Yellow
+            border.BorderThickness <- Thickness(3.0)
+        
         border.Child <- text
         border
 
@@ -77,9 +286,11 @@ type SeatMapWindow(rows: int, cols: int) as this =
         let availableCount = getAvailableSeats cinemaState.Seats |> List.length
         let reservedCount = getReservedSeats cinemaState.Seats |> List.length
 
-        // ===== عرض الإحصائيات =====
-        let stats = new TextBlock(Text=sprintf "Available: %d | Reserved: %d" availableCount reservedCount,
-                                  FontSize=16.0, Foreground=Brushes.Black, Margin=Thickness(0.0,0.0,0.0,10.0))
+        // ===== عرض الإحصائيات مع timestamp =====
+        let timestamp = DateTime.Now.ToString("HH:mm:ss")
+        let stats = new TextBlock(
+            Text=sprintf "Available: %d | Reserved: %d | Last Update: %s" availableCount reservedCount timestamp,
+            FontSize=16.0, Foreground=Brushes.Black, Margin=Thickness(0.0,0.0,0.0,10.0))
         seatsPanel.Children.Add(stats) |> ignore
 
         // ===== عرض أسماء الأعمدة =====
@@ -158,29 +369,65 @@ type SeatMapWindow(rows: int, cols: int) as this =
                 if not allAvailable then
                     statusMessage.Text <- "Some seats are already reserved!"
                 else
-                    // ===== إنشاء التيكت =====
-                    match createTicket seatPositions cinemaState.Seats with
-                    | Error badSeats ->
+                    // ===== إنشاء تيكت منفصل لكل كرسي =====
+                    let mutable currentSeats = cinemaState.Seats
+                    let mutable newTickets = []
+                    let mutable allSuccessful = true
+                    let mutable errorSeats = []
+
+                    seatPositions |> List.iter (fun (r, c) ->
+                        match createTicket gridId [(r, c)] currentSeats with
+                        | Error badSeats ->
+                            allSuccessful <- false
+                            errorSeats <- (r, c) :: errorSeats
+                        | Ok (ticket, updatedSeats) ->
+                            currentSeats <- updatedSeats
+                            newTickets <- ticket :: newTickets
+                    )
+
+                    if not allSuccessful then
                         // ===== تلوين المدخلات الغير صالحة =====
                         positions |> List.iter (fun (r,c,rowBox,colBox) ->
-                            if badSeats |> List.contains (r,c) then
+                            if errorSeats |> List.contains (r,c) then
                                 rowBox.Background <- SolidColorBrush(Color.Parse("#FFAAAA"))
                                 colBox.Background <- SolidColorBrush(Color.Parse("#FFAAAA"))
                         )
                         statusMessage.Text <- "Some seats are invalid or already reserved!"
-                    | Ok (ticket, updatedSeats) ->
+                    else
                         // ===== تحديث الحالة الداخلية للسينما =====
-                        cinemaState <- { cinemaState with Seats = updatedSeats; Tickets = ticket :: cinemaState.Tickets }
-                        this.GenerateSeats()
-                        statusMessage.Text <- "Reservation successful!"
+                        previousSeats <- cinemaState.Seats // Save previous state
+                        cinemaState <- { cinemaState with Seats = currentSeats; Tickets = newTickets @ cinemaState.Tickets }
+                        
+                        // Mark changed seats for highlighting
+                        recentlyChangedSeats <- seatPositions |> Set.ofList
+                        
+                        // ===== كتابة التيكتات مباشرة في الملف بعد الحجز =====
+                        if this.SaveTicketsToFile() then
+                            // ===== إعادة تحميل الحالة من الملف للتزامن مع النوافذ الأخرى =====
+                            this.LoadTicketsFromFile()
+                            this.GenerateSeats()
+                            statusMessage.Text <- sprintf "Reservation successful! %d ticket(s) created and saved." newTickets.Length
+                        else
+                            this.GenerateSeats()
+                            statusMessage.Text <- sprintf "Reservation successful! %d ticket(s) created but file save failed." newTickets.Length
+                        
                         ticketsButton.IsVisible <- true
+                        
+                        // Clear highlight after 3 seconds
+                        System.Threading.Tasks.Task.Delay(3000).ContinueWith(fun _ ->
+                            Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                                recentlyChangedSeats <- Set.empty
+                                this.GenerateSeats()
+                            )
+                        ) |> ignore
         with ex ->
             statusMessage.Text <- sprintf "Error: %s" ex.Message
 
     // ===== صفحة عرض التيكتات مع أزرار Download & Back =====
     member private this.ShowTicketsPage() =
         let ticketsWindow = new Window(Title="Tickets", Width=900.0, Height=600.0)
-        let imgBrush = new ImageBrush(Source=Bitmap("C:\\Users\\hp\\Documents\\Material\\PL3\\images\\Gemini_Generated_Image_weludaweludawelu.png"), Stretch=Stretch.UniformToFill)
+        let assets = AssetLoader.Open(new Uri("avares://CinemaSeatBooking/images/background_tickets.png"))
+        let imgBrush = new ImageBrush(Source=new Bitmap(assets), Stretch=Stretch.UniformToFill)
         ticketsWindow.Background <- imgBrush
 
         let scroll = new ScrollViewer(Margin=Thickness(20.0))
@@ -190,30 +437,11 @@ type SeatMapWindow(rows: int, cols: int) as this =
                                   HorizontalAlignment=HorizontalAlignment.Center, Margin=Thickness(0.0,0.0,0.0,20.0))
         panel.Children.Add(title) |> ignore
 
-        // ===== أزرار Download و Back =====
+        // ===== زر Back فقط =====
         let buttonsPanel = new StackPanel(Orientation=Orientation.Horizontal, Spacing=10.0, HorizontalAlignment=HorizontalAlignment.Center)
-        let downloadButton = new Button(Content="Download Tickets", Width=150.0, Background=SolidColorBrush(Color.Parse("#4CAF50")), Foreground=Brushes.White)
         let backButton = new Button(Content="Back", Width=100.0, Background=SolidColorBrush(Color.Parse("#FF5555")), Foreground=Brushes.White)
-        buttonsPanel.Children.Add(downloadButton) |> ignore
         buttonsPanel.Children.Add(backButton) |> ignore
         panel.Children.Add(buttonsPanel) |> ignore
-
-        // ===== تحميل تيكتات في ملف =====
-        downloadButton.Click.Add(fun _ ->
-            try
-                let path = "Tickets.txt"
-                use writer = new System.IO.StreamWriter(path)
-                cinemaState.Tickets |> List.iter (fun ticket ->
-                    writer.WriteLine(sprintf "Ticket ID: %A | Created At: %s" ticket.Id (ticket.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")))
-                    ticket.Seats |> List.iter (fun s ->
-                        writer.WriteLine(sprintf "Seat: Row %d, Col %d" s.Row s.Col)
-                    )
-                    writer.WriteLine("--------------------------------------------------")
-                )
-                statusMessage.Text <- sprintf "Tickets saved to %s" path
-            with ex ->
-                statusMessage.Text <- sprintf "Error saving tickets: %s" ex.Message
-        )
 
         // ===== زر العودة =====
         backButton.Click.Add(fun _ -> ticketsWindow.Close())
@@ -245,10 +473,105 @@ type SeatMapWindow(rows: int, cols: int) as this =
                     match cancelReservation ticket.Id cinemaState with
                     | Error msg -> statusMessage.Text <- msg
                     | Ok updatedState ->
+                        // Mark cancelled seats for highlighting
+                        let cancelledSeats = ticket.Seats |> List.map (fun s -> (s.Row, s.Col)) |> Set.ofList
+                        recentlyChangedSeats <- cancelledSeats
+                        
+                        previousSeats <- cinemaState.Seats
                         cinemaState <- updatedState
+                        
+                        // Update Tickets.txt file after deletion
+                        if this.SaveTicketsToFile() then
+                            // ===== إعادة تحميل الحالة من الملف للتأكد من التزامن =====
+                            this.LoadTicketsFromFile()
+                            statusMessage.Text <- "Ticket cancelled, file updated, and grid refreshed"
+                        else
+                            statusMessage.Text <- "Ticket cancelled but error updating file"
+                        
+                        // Regenerate the grid with updated seats
                         this.GenerateSeats()
-                        ticketsWindow.Content <- null
-                        this.ShowTicketsPage()
+                        
+                        // Clear highlight after 3 seconds
+                        System.Threading.Tasks.Task.Delay(3000).ContinueWith(fun _ ->
+                            Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                                recentlyChangedSeats <- Set.empty
+                                this.GenerateSeats()
+                            )
+                        ) |> ignore
+                        
+                        // Refresh the current window content without opening a new one
+                        panel.Children.Clear()
+                        
+                        let title = new TextBlock(Text="Your Tickets", FontSize=28.0, Foreground=Brushes.Red,
+                                                  HorizontalAlignment=HorizontalAlignment.Center, Margin=Thickness(0.0,0.0,0.0,20.0))
+                        panel.Children.Add(title) |> ignore
+
+                        let buttonsPanel = new StackPanel(Orientation=Orientation.Horizontal, Spacing=10.0, HorizontalAlignment=HorizontalAlignment.Center)
+                        let backButton = new Button(Content="Back", Width=100.0, Background=SolidColorBrush(Color.Parse("#FF5555")), Foreground=Brushes.White)
+                        buttonsPanel.Children.Add(backButton) |> ignore
+                        panel.Children.Add(buttonsPanel) |> ignore
+                        backButton.Click.Add(fun _ -> ticketsWindow.Close())
+
+                        if cinemaState.Tickets.Length > 0 then
+                            cinemaState.Tickets |> List.iter (fun t ->
+                                let border = new Border(Background=SolidColorBrush(Color.Parse("#88FFFFFF")), CornerRadius=CornerRadius(5.0),
+                                                        Padding=Thickness(10.0), Margin=Thickness(5.0))
+                                let stack = new StackPanel(Spacing=5.0)
+                                stack.Children.Add(
+                                    new TextBlock(
+                                        Text=sprintf "🎫 Ticket ID: %A | Created At: %s"
+                                            t.Id (t.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")),
+                                        FontSize=16.0, Foreground=Brushes.Red)) |> ignore
+                                t.Seats |> List.iter (fun s ->
+                                    stack.Children.Add(new TextBlock(Text=sprintf "Seat: Row %d, Col %d" s.Row s.Col,
+                                                                     FontSize=16.0, Foreground=Brushes.Red)) |> ignore)
+                                let cancelBtn = new Button(Content="Cancel Ticket", Width=120.0,
+                                                          Background=SolidColorBrush(Color.Parse("#FF5555")),
+                                                          Foreground=Brushes.White)
+                                cancelBtn.Click.Add(fun _ ->
+                                    match cancelReservation t.Id cinemaState with
+                                    | Error msg -> statusMessage.Text <- msg
+                                    | Ok updatedState ->
+                                        cinemaState <- updatedState
+                                        
+                                        // Update Tickets.txt file after deletion
+                                        if this.SaveTicketsToFile() then
+                                            // ===== إعادة تحميل الحالة من الملف للتأكد من التزامن =====
+                                            this.LoadTicketsFromFile()
+                                            statusMessage.Text <- "Ticket cancelled, file updated, and grid refreshed"
+                                        else
+                                            statusMessage.Text <- "Ticket cancelled but error updating file"
+                                        
+                                        // Regenerate the grid with updated seats
+                                        this.GenerateSeats()
+                                        
+                                        panel.Children.Clear()
+                                        let title = new TextBlock(Text="Your Tickets", FontSize=28.0, Foreground=Brushes.Red,
+                                                                  HorizontalAlignment=HorizontalAlignment.Center, Margin=Thickness(0.0,0.0,0.0,20.0))
+                                        panel.Children.Add(title) |> ignore
+                                        let buttonsPanel = new StackPanel(Orientation=Orientation.Horizontal, Spacing=10.0, HorizontalAlignment=HorizontalAlignment.Center)
+                                        let backButton = new Button(Content="Back", Width=100.0, Background=SolidColorBrush(Color.Parse("#FF5555")), Foreground=Brushes.White)
+                                        buttonsPanel.Children.Add(backButton) |> ignore
+                                        panel.Children.Add(buttonsPanel) |> ignore
+                                        backButton.Click.Add(fun _ -> ticketsWindow.Close())
+                                        if cinemaState.Tickets.Length = 0 then
+                                            let border = new Border(Background=SolidColorBrush(Color.Parse("#88FFFFFF")),
+                                                                    CornerRadius=CornerRadius(5.0), Padding=Thickness(10.0),
+                                                                    Margin=Thickness(5.0))
+                                            let textBlock = new TextBlock(Text="No tickets booked yet!", FontSize=16.0, Foreground=Brushes.Red)
+                                            border.Child <- textBlock
+                                            panel.Children.Add(border) |> ignore
+                                )
+                                stack.Children.Add(cancelBtn) |> ignore
+                                border.Child <- stack
+                                panel.Children.Add(border) |> ignore)
+                        else
+                            let border = new Border(Background=SolidColorBrush(Color.Parse("#88FFFFFF")),
+                                                    CornerRadius=CornerRadius(5.0), Padding=Thickness(10.0),
+                                                    Margin=Thickness(5.0))
+                            let textBlock = new TextBlock(Text="No tickets booked yet!", FontSize=16.0, Foreground=Brushes.Red)
+                            border.Child <- textBlock
+                            panel.Children.Add(border) |> ignore
                 )
 
                 stack.Children.Add(cancelButton) |> ignore

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
@@ -10,6 +10,7 @@
 		<Compile Include="types.fs" />
 		<Compile Include="SeatManagement.fs" />
 		<Compile Include="BookingLogic.fs" />
+		<Compile Include="ApiIntegration.fs" />
 		<Compile Include="SeatMapWindow.axaml.fs" />
 		<Compile Include="MainWindow.axaml.fs" />
 		<Compile Include="App.axaml.fs" />
@@ -17,8 +18,9 @@
 
 	</ItemGroup>
 
-
-
+	<ItemGroup>
+		<AvaloniaResource Include="images\**\*" />
+	</ItemGroup>
 
 
 	<ItemGroup />

@@ -7,7 +7,7 @@
 		x:Class="CinemaSeatBooking.MainWindow"
 		Title="CinemaSeatBooking">
 	<Grid>
-		<Image Source="C:\Users\hp\Documents\Material\PL3\images\Gemini_Generated_Image_bwlbbcbwlbbcbwlb.png" Stretch="UniformToFill" />
+		<Image Source="avares://CinemaSeatBooking/images/background_main.png" Stretch="UniformToFill" />
 		<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="15">
 			<TextBlock Text="Enter number of Rows:" Foreground="#800000" FontWeight="Bold"/>
 			<TextBox Name="RowsTextBox" Width="200"/>

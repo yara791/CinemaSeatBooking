@@ -2,9 +2,14 @@ namespace CinemaSeatBooking
 
 module ApiIntegration =
 
+    open System
+    open System.Threading
     open CinemaSeatBooking
 
-    // ÇáÊÍÞÞ ãä ÕÍÉ ÇáØáÈ
+    // Thread-safe lock for API operations
+    let private apiLock = obj()
+
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
     let validateRequest (request: ReserveRequest) =
         if request.SeatPositions.IsEmpty then
             Error "Seat positions cannot be empty"
@@ -13,99 +18,111 @@ module ApiIntegration =
         else
             Ok request
 
-    // API: ÇáÍÕæá Úáì ÌãíÚ ÇáßÑÇÓí
+    // API: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - Thread-safe
     let getSeatsApi (state: CinemaState) =
-        {
-            Success = true
-            Data = Some state.Seats
-            Error = None
-        }
-
-    // API: ÍÌÒ ÇáßÑÇÓí
-    let postReserveSeatsApi (request: ReserveRequest) (state: CinemaState) =
-        match validateRequest request with
-        | Error msg -> 
+        lock apiLock (fun () ->
             {
-                Success = false
-                Data = None
-                Error = Some msg
+                Success = true
+                Data = Some state.Seats
+                Error = None
             }
-        | Ok validRequest ->
-            match BookingLogic.createTicket validRequest.SeatPositions state.Seats with
-            | Error badSeats ->
+        )
+
+    // API: Ø­Ø¬Ø² ÙƒØ±Ø§Ø³ÙŠ - Thread-safe
+    let postReserveSeatsApi (gridId: string) (request: ReserveRequest) (state: CinemaState) =
+        lock apiLock (fun () ->
+            match validateRequest request with
+            | Error msg -> 
                 {
                     Success = false
                     Data = None
-                    Error = Some $"Seats unavailable: {badSeats}"
+                    Error = Some msg
                 }
-            | Ok (ticket, updatedSeats) ->
-                let newState = { 
-                    Seats = updatedSeats
-                    Tickets = ticket :: state.Tickets 
-                }
+            | Ok validRequest ->
+                match BookingLogic.createTicket gridId validRequest.SeatPositions state.Seats with
+                | Error badSeats ->
+                    {
+                        Success = false
+                        Data = None
+                        Error = Some $"Seats unavailable: {badSeats}"
+                    }
+                | Ok (ticket, updatedSeats) ->
+                    let newState = { 
+                        Seats = updatedSeats
+                        Tickets = ticket :: state.Tickets 
+                    }
+                    {
+                        Success = true
+                        Data = Some (ticket, newState)
+                        Error = None
+                    }
+        )
+
+    // API: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ - Thread-safe
+    let getTicketApi (ticketId: Guid) (state: CinemaState) =
+        lock apiLock (fun () ->
+            match state.Tickets |> List.tryFind (fun t -> t.Id = ticketId) with
+            | Some ticket ->
                 {
                     Success = true
-                    Data = Some (ticket, newState)
+                    Data = Some ticket
                     Error = None
                 }
+            | None ->
+                {
+                    Success = false
+                    Data = None
+                    Error = Some "Ticket not found"
+                }
+        )
 
-    // API: ÇáÍÕæá Úáì ÊÐßÑÉ ãÚíäÉ
-    let getTicketApi (ticketId: Guid) (state: CinemaState) =
-        match state.Tickets |> List.tryFind (fun t -> t.Id = ticketId) with
-        | Some ticket ->
-            {
-                Success = true
-                Data = Some ticket
-                Error = None
-            }
-        | None ->
-            {
-                Success = false
-                Data = None
-                Error = Some "Ticket not found"
-            }
-
-    // API: ÇáÍÕæá Úáì ÌãíÚ ÇáÊÐÇßÑ
+    // API: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - Thread-safe
     let getAllTicketsApi (state: CinemaState) =
-        {
-            Success = true
-            Data = Some state.Tickets
-            Error = None
-        }
-
-    // API: ÅáÛÇÁ ÍÌÒ
-    let deleteTicketApi (ticketId: Guid) (state: CinemaState) =
-        match BookingLogic.cancelReservation ticketId state with
-        | Ok newState ->
+        lock apiLock (fun () ->
             {
                 Success = true
-                Data = Some newState
+                Data = Some state.Tickets
                 Error = None
             }
-        | Error msg ->
-            {
-                Success = false
-                Data = None
-                Error = Some msg
-            }
+        )
 
-    // API: ÅÍÕÇÆíÇÊ ÇáÓíäãÇ
+    // API: ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ - Thread-safe
+    let deleteTicketApi (ticketId: Guid) (state: CinemaState) =
+        lock apiLock (fun () ->
+            match BookingLogic.cancelReservation ticketId state with
+            | Ok newState ->
+                {
+                    Success = true
+                    Data = Some newState
+                    Error = None
+                }
+            | Error msg ->
+                {
+                    Success = false
+                    Data = None
+                    Error = Some msg
+                }
+        )
+
+    // API: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - Thread-safe
     let getStatsApi (state: CinemaState) =
-        let availableCount = state.Seats |> List.filter (fun s -> s.Status = Available) |> List.length
-        let reservedCount = state.Seats |> List.filter (fun s -> s.Status = Reserved) |> List.length
-        let totalSeats = state.Seats.Length
-        let totalTickets = state.Tickets.Length
-    
-        let stats = {|
-            TotalSeats = totalSeats
-            AvailableSeats = availableCount
-            ReservedSeats = reservedCount
-            TotalTickets = totalTickets
-            OccupancyRate = if totalSeats > 0 then (float reservedCount / float totalSeats * 100.0) else 0.0
-        |}
-    
-        {
-            Success = true
-            Data = Some stats
-            Error = None
-        }
+        lock apiLock (fun () ->
+            let availableCount = state.Seats |> List.filter (fun s -> s.Status = Available) |> List.length
+            let reservedCount = state.Seats |> List.filter (fun s -> s.Status = Reserved) |> List.length
+            let totalSeats = state.Seats.Length
+            let totalTickets = state.Tickets.Length
+        
+            let stats = {|
+                TotalSeats = totalSeats
+                AvailableSeats = availableCount
+                ReservedSeats = reservedCount
+                TotalTickets = totalTickets
+                OccupancyRate = if totalSeats > 0 then (float reservedCount / float totalSeats * 100.0) else 0.0
+            |}
+        
+            {
+                Success = true
+                Data = Some stats
+                Error = None
+            }
+        )

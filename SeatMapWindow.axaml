@@ -4,7 +4,7 @@
         Title="SeatMapWindow" Width="900" Height="600">
 
 	<Grid x:Name="RootGrid" Margin="10">
-		<Image Source="C:\Users\hp\Documents\Material\PL3\images\Gemini_Generated_Image_qjrw0qjrw0qjrw0q.png"
+		<Image Source="avares://CinemaSeatBooking/images/background_seatmap.png"
                Stretch="UniformToFill"/>
 
 		<Grid>

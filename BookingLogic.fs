@@ -3,64 +3,77 @@ namespace CinemaSeatBooking
 module BookingLogic =
 
     open System
+    open System.Threading
     open CinemaSeatBooking
     open SeatManagement
 
-    // ÇáİÇäßÔä ÈÊÇÚÉ ÇáÍÌÒ
+    // Thread-safe lock object for critical booking operations
+    let private bookingLock = obj()
+
+    // Ø­Ø¬Ø² Ø§Ù„ÙƒØ±Ø§Ø³ÙŠ - Thread-safe version
     let reserveSeats seatPositions seats =
-        let unavailable =
-            seatPositions
-            |> List.choose (fun (r, c) ->
-                match selectSeat r c seats with
-                | None -> Some (r, c)
-                | Some s when s.Status = SeatStatus.Reserved -> Some (r, c)
-                | _ -> None)
-
-        if unavailable.Length > 0 then
-            Error unavailable
-        else
-            let updated =
+        lock bookingLock (fun () ->
+            // Check availability
+            let unavailable =
                 seatPositions
-                |> List.fold (fun acc (r, c) ->
-                    acc |> List.map (fun s ->
-                        if s.Row = r && s.Col = c then { s with Status = SeatStatus.Reserved }
-                        else s)) seats
-            Ok updated
+                |> List.choose (fun (r, c) ->
+                    match selectSeat r c seats with
+                    | None -> Some (r, c)
+                    | Some s when s.Status = SeatStatus.Reserved -> Some (r, c)
+                    | _ -> None)
 
-    // ÊæáíÏ GUID
+            if unavailable.Length > 0 then
+                Error unavailable
+            else
+                // Reserve seats atomically
+                let updated =
+                    seatPositions
+                    |> List.fold (fun acc (r, c) ->
+                        acc |> List.map (fun s ->
+                            if s.Row = r && s.Col = c then { s with Status = SeatStatus.Reserved }
+                            else s)) seats
+                Ok updated
+        )
+
+    // Ø¥Ù†Ø´Ø§Ø¡ GUID
     let generateTicketId() = Guid.NewGuid()
 
-    // ÅäÔÇÁ ÇáÊíßÊ
-    let createTicket seatPositions seats =
-        match reserveSeats seatPositions seats with
-        | Error badSeats -> Error badSeats
-        | Ok updated ->
-            let booked =
-                seatPositions
-                |> List.choose (fun (r, c) -> selectSeat r c updated)
-            let ticket = {
-                Id = generateTicketId()
-                Seats = booked
-                CreatedAt = DateTime.UtcNow
-            }
-            Ok (ticket, updated)
+    // Ø¥Ù†Ø´Ø§Ø¡ ØªÙŠÙƒØª - Thread-safe version
+    let createTicket gridId seatPositions seats =
+        lock bookingLock (fun () ->
+            match reserveSeats seatPositions seats with
+            | Error badSeats -> Error badSeats
+            | Ok updated ->
+                let booked =
+                    seatPositions
+                    |> List.choose (fun (r, c) -> selectSeat r c updated)
+                let ticket = {
+                    Id = generateTicketId()
+                    GridId = gridId
+                    Seats = booked
+                    CreatedAt = DateTime.UtcNow
+                }
+                Ok (ticket, updated)
+        )
 
-    // ÅáÛÇÁ ÇáÍÌÒ
+    // Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø­Ø¬Ø² - Thread-safe version
     let cancelReservation ticketId (state: CinemaState) =
-        match state.Tickets |> List.tryFind (fun t -> t.Id = ticketId) with
-        | None -> Error "Ticket not found"
-        | Some ticket ->
-            let seatPositions = ticket.Seats |> List.map (fun s -> (s.Row, s.Col))
-            let updatedSeats =
-                state.Seats
-                |> List.map (fun s ->
-                    if seatPositions |> List.contains (s.Row, s.Col) then
-                        { s with Status = SeatStatus.Available }
-                    else s)
-            let updatedTickets = state.Tickets |> List.filter (fun t -> t.Id <> ticketId)
-            Ok { Seats = updatedSeats; Tickets = updatedTickets }
+        lock bookingLock (fun () ->
+            match state.Tickets |> List.tryFind (fun t -> t.Id = ticketId) with
+            | None -> Error "Ticket not found"
+            | Some ticket ->
+                let seatPositions = ticket.Seats |> List.map (fun s -> (s.Row, s.Col))
+                let updatedSeats =
+                    state.Seats
+                    |> List.map (fun s ->
+                        if seatPositions |> List.contains (s.Row, s.Col) then
+                            { s with Status = SeatStatus.Available }
+                        else s)
+                let updatedTickets = state.Tickets |> List.filter (fun t -> t.Id <> ticketId)
+                Ok { Seats = updatedSeats; Tickets = updatedTickets }
+        )
 
-    // ÚÑÖ ÊİÇÕíá ÇáÊíßÊ
+    // Ø¹Ø±Ø¶ ØªÙØ§ØµÙŠÙ„ Ø§Ù„ØªÙŠÙƒØª
     let displayTicket (ticket: Ticket) =
         printfn "\n--- Ticket Details ---"
         printfn "ID: %A" ticket.Id
