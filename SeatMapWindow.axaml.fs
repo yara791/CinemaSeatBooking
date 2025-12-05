@@ -37,6 +37,7 @@ type SeatMapWindow(rows: int, cols: int) as this =
     // ===== Dynamic seat refresh timer =====
     let mutable refreshTimer: System.Timers.Timer = null
     let mutable lastUpdateTime = DateTime.Now
+    let mutable lastFileChangeTime = DateTime.MinValue
     let mutable previousSeats: Seat list = []
     let mutable recentlyChangedSeats: Set<int * int> = Set.empty
     
@@ -54,11 +55,16 @@ type SeatMapWindow(rows: int, cols: int) as this =
         ticketsButton <- this.FindControl<Button>("TicketsButton")
         statusMessage <- this.FindControl<TextBlock>("StatusMessageTextBlock")
 
-        ticketsButton.IsVisible <- false // في البداية زرار التيكت مخفي
         seatsPanel.HorizontalAlignment <- HorizontalAlignment.Left
 
         // ===== Load existing tickets from file and restore state =====
         this.LoadTicketsFromFile()
+        
+        // ===== Initialize previousSeats for change detection =====
+        previousSeats <- cinemaState.Seats
+        
+        // ===== Show tickets button if there are any tickets for this grid =====
+        ticketsButton.IsVisible <- cinemaState.Tickets.Length > 0
 
         // ===== عرض الكراسي عند فتح البرنامج =====
         this.GenerateSeats()
@@ -95,17 +101,28 @@ type SeatMapWindow(rows: int, cols: int) as this =
             let fileName = System.IO.Path.GetFileName(path)
             
             fileWatcher <- new FileSystemWatcher(directory, fileName)
-            fileWatcher.NotifyFilter <- NotifyFilters.LastWrite ||| NotifyFilters.Size
+            fileWatcher.NotifyFilter <- NotifyFilters.LastWrite ||| NotifyFilters.Size ||| NotifyFilters.CreationTime
             fileWatcher.EnableRaisingEvents <- true
             
-            // Handle file changes
-            fileWatcher.Changed.Add(fun _ ->
-                // Small delay to ensure file write is complete
-                System.Threading.Thread.Sleep(100)
-                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
-                    this.RefreshSeatsDisplay()
-                )
-            )
+            // Common handler for file changes
+            let handleFileChange _ =
+                let now = DateTime.Now
+                // Only refresh if at least 200ms has passed since last file change
+                if (now - lastFileChangeTime).TotalMilliseconds > 200.0 then
+                    lastFileChangeTime <- now
+                    // Small delay to ensure file write is complete
+                    System.Threading.Thread.Sleep(150)
+                    Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                        try
+                            this.RefreshSeatsDisplay()
+                        with ex ->
+                            statusMessage.Text <- sprintf "Update error: %s" ex.Message
+                    )
+            
+            // Handle file changes with debounce to prevent multiple rapid updates
+            fileWatcher.Changed.Add(handleFileChange)
+            // Also handle file creation (in case file is deleted/recreated)
+            fileWatcher.Created.Add(handleFileChange)
         with ex ->
             // If file watcher fails, fallback to timer-based refresh
             statusMessage.Text <- sprintf "File watcher setup failed, using timer-based refresh: %s" ex.Message
@@ -114,6 +131,9 @@ type SeatMapWindow(rows: int, cols: int) as this =
     member private this.RefreshSeatsDisplay() =
         // ===== إعادة تحميل الحالة من الملف للتزامن مع النوافذ الأخرى =====
         this.LoadTicketsFromFile()
+        
+        // ===== Update tickets button visibility based on loaded tickets =====
+        ticketsButton.IsVisible <- cinemaState.Tickets.Length > 0
         
         // Detect seat changes
         let changes = 
@@ -130,6 +150,16 @@ type SeatMapWindow(rows: int, cols: int) as this =
             previousSeats <- cinemaState.Seats
             this.GenerateSeats()
             // Clear highlight after 3 seconds
+            System.Threading.Tasks.Task.Delay(3000).ContinueWith(fun _ ->
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    recentlyChangedSeats <- Set.empty
+                    this.GenerateSeats()
+                )
+            ) |> ignore
+        elif previousSeats.IsEmpty then
+            // First refresh - initialize previousSeats
+            previousSeats <- cinemaState.Seats
+            this.GenerateSeats()
             System.Threading.Tasks.Task.Delay(3000).ContinueWith(fun _ ->
                 Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
                     recentlyChangedSeats <- Set.empty
@@ -158,6 +188,10 @@ type SeatMapWindow(rows: int, cols: int) as this =
     // ===== حفظ التيكتات في الملف - دالة مساعدة =====
     member private this.SaveTicketsToFile() =
         try
+            // Temporarily disable file watcher to avoid self-triggering
+            if fileWatcher <> null then
+                fileWatcher.EnableRaisingEvents <- false
+            
             let path = "Tickets.txt"
             use writer = new StreamWriter(path)
             cinemaState.Tickets |> List.iter (fun ticket ->
@@ -167,8 +201,19 @@ type SeatMapWindow(rows: int, cols: int) as this =
                 )
                 writer.WriteLine("--------------------------------------------------")
             )
+            writer.Close() // Ensure file is fully written
+            
+            // Re-enable file watcher after a brief delay
+            System.Threading.Tasks.Task.Delay(300).ContinueWith(fun _ ->
+                if fileWatcher <> null then
+                    fileWatcher.EnableRaisingEvents <- true
+            ) |> ignore
+            
             true
         with ex ->
+            // Re-enable watcher even on error
+            if fileWatcher <> null then
+                fileWatcher.EnableRaisingEvents <- true
             statusMessage.Text <- sprintf "Error saving tickets to file: %s" ex.Message
             false
 
@@ -488,6 +533,9 @@ type SeatMapWindow(rows: int, cols: int) as this =
                         else
                             statusMessage.Text <- "Ticket cancelled but error updating file"
                         
+                        // ===== Update tickets button visibility =====
+                        ticketsButton.IsVisible <- cinemaState.Tickets.Length > 0
+                        
                         // Regenerate the grid with updated seats
                         this.GenerateSeats()
                         
@@ -541,6 +589,9 @@ type SeatMapWindow(rows: int, cols: int) as this =
                                             statusMessage.Text <- "Ticket cancelled, file updated, and grid refreshed"
                                         else
                                             statusMessage.Text <- "Ticket cancelled but error updating file"
+                                        
+                                        // ===== Update tickets button visibility =====
+                                        ticketsButton.IsVisible <- cinemaState.Tickets.Length > 0
                                         
                                         // Regenerate the grid with updated seats
                                         this.GenerateSeats()
