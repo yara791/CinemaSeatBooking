@@ -80,6 +80,9 @@ type SeatMapWindow(rows: int, cols: int) as this =
         // ===== Cleanup on window closing =====
         this.Closing.Add(fun _ -> this.Cleanup())
 
+    // ===== Parameterless constructor for XAML loader =====
+    new() = SeatMapWindow(5, 10)  // Default 5 rows x 10 columns
+
     // ===== Setup dynamic refresh timer =====
     member private this.SetupDynamicRefresh() =
         // ===== Setup periodic timer (backup mechanism) =====

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+  <assembly fullname="CinemaSeatBooking">
+    <resource name="FSharpSignatureData.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpSignatureCompressedData.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpSignatureDataB.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpSignatureCompressedDataB.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpOptimizationData.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpOptimizationCompressedData.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpOptimizationDataB.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpOptimizationCompressedDataB.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpOptimizationInfo.CinemaSeatBooking" action="remove"></resource>
+    <resource name="FSharpSignatureInfo.CinemaSeatBooking" action="remove"></resource>
+  </assembly>
+</linker>
