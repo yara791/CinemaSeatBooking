@@ -196,8 +196,55 @@ type SeatMapWindow(rows: int, cols: int) as this =
                 fileWatcher.EnableRaisingEvents <- false
             
             let path = "Tickets.txt"
+            
+            // Load all existing tickets from file (from all grids)
+            let allTickets = 
+                if System.IO.File.Exists(path) then
+                    let lines = System.IO.File.ReadAllLines(path) |> Array.toList
+                    
+                    let rec parseAllTickets (lines: string list) (acc: Ticket list) =
+                        match lines with
+                        | [] -> List.rev acc
+                        | line :: rest ->
+                            if line.StartsWith("Grid ID:") then
+                                // Parse Grid ID, Ticket ID and timestamp
+                                let parts = line.Split('|')
+                                let ticketGridId = parts.[0].Replace("Grid ID:", "").Trim()
+                                let idPart = parts.[1].Replace("Ticket ID:", "").Trim()
+                                let ticketId = Guid.Parse(idPart)
+                                let datePart = parts.[2].Replace("Created At:", "").Trim()
+                                let createdAt = DateTime.Parse(datePart)
+                                
+                                // Parse seats for this ticket
+                                let rec parseSeats (remaining: string list) (seats: Seat list) =
+                                    match remaining with
+                                    | seatLine :: rest when seatLine.StartsWith("Seat:") ->
+                                        // Parse "Seat: Row X, Col Y"
+                                        let seatParts = seatLine.Replace("Seat:", "").Split(',')
+                                        let row = seatParts.[0].Replace("Row", "").Trim() |> int
+                                        let col = seatParts.[1].Replace("Col", "").Trim() |> int
+                                        let seat = { Row = row; Col = col; Status = SeatStatus.Reserved }
+                                        parseSeats rest (seat :: seats)
+                                    | _ :: rest -> (List.rev seats, rest)
+                                    | [] -> (List.rev seats, [])
+                                
+                                let (seats, remaining) = parseSeats rest []
+                                let ticket = { Id = ticketId; GridId = ticketGridId; Seats = seats; CreatedAt = createdAt }
+                                parseAllTickets remaining (ticket :: acc)
+                            else
+                                parseAllTickets rest acc
+                    
+                    parseAllTickets lines []
+                else
+                    []
+            
+            // Remove tickets from the current grid and add the current state's tickets
+            let otherGridTickets = allTickets |> List.filter (fun t -> t.GridId <> gridId)
+            let combinedTickets = otherGridTickets @ cinemaState.Tickets
+            
+            // Write all tickets (from all grids) to file
             use writer = new StreamWriter(path)
-            cinemaState.Tickets |> List.iter (fun ticket ->
+            combinedTickets |> List.iter (fun ticket ->
                 writer.WriteLine(sprintf "Grid ID: %s | Ticket ID: %A | Created At: %s" ticket.GridId ticket.Id (ticket.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")))
                 ticket.Seats |> List.iter (fun s ->
                     writer.WriteLine(sprintf "Seat: Row %d, Col %d" s.Row s.Col)

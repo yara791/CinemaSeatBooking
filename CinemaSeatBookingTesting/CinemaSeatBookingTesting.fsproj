@@ -8,6 +8,10 @@
   <ItemGroup>
     <Compile Include="DoubleBookingTest.fs" />
     <Compile Include="SingleSeatBookingTest.fs" />
+    <Compile Include="SequentialBookingTest.fs" />
+    <Compile Include="MixedValidInvalidSeatsTest.fs" />
+    <Compile Include="DuplicateBookingTest.fs" />
+    <Compile Include="AlreadyReservedSeatTest.fs" />
     <Compile Include="InitializationTest.fs" />
   </ItemGroup>
 

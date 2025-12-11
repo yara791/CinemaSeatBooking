@@ -6,7 +6,7 @@ module SingleSeatBookingTest =
     open CinemaSeatBooking.SeatManagement 
     open CinemaSeatBooking.BookingLogic
 
-     type SingleSeatBookingTest() =
+    type SingleSeatBookingTest() =
         [<Fact>]
         member _.``Booking one seat changes its status to Reserved`` () =
             let seats = initializeSeatLayout 4 4

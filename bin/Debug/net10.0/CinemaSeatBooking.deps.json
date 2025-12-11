@@ -13,7 +13,7 @@
           "Avalonia.Diagnostics": "11.3.9",
           "Avalonia.Fonts.Inter": "11.3.9",
           "Avalonia.Themes.Fluent": "11.3.9",
-          "FSharp.Core": "10.0.101"
+          "FSharp.Core": "10.0.100"
         },
         "runtime": {
           "CinemaSeatBooking.dll": {}
@@ -76,17 +76,17 @@
           "runtimes/win-arm64/native/av_libglesv2.dll": {
             "rid": "win-arm64",
             "assetType": "native",
-            "fileVersion": "2.1.25606.0"
+            "fileVersion": "0.0.0.0"
           },
           "runtimes/win-x64/native/av_libglesv2.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "2.1.25606.0"
+            "fileVersion": "0.0.0.0"
           },
           "runtimes/win-x86/native/av_libglesv2.dll": {
             "rid": "win-x86",
             "assetType": "native",
-            "fileVersion": "2.1.25606.0"
+            "fileVersion": "0.0.0.0"
           }
         }
       },
@@ -245,11 +245,11 @@
           }
         }
       },
-      "FSharp.Core/10.0.101": {
+      "FSharp.Core/10.0.100": {
         "runtime": {
           "lib/netstandard2.1/FSharp.Core.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.1.125.57005"
+            "fileVersion": "42.42.42.42424"
           }
         },
         "resources": {
@@ -582,12 +582,12 @@
       "path": "avalonia.x11/11.3.9",
       "hashPath": "avalonia.x11.11.3.9.nupkg.sha512"
     },
-    "FSharp.Core/10.0.101": {
+    "FSharp.Core/10.0.100": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-mrS3J7cLtvXM3u3CmiaFq8oyBdlevzZY1VAAAbFk1gUDQtDEjUOybN5XpQglx5wAgJ0wLdDl6OSSfS7ZDFNcpA==",
-      "path": "fsharp.core/10.0.101",
-      "hashPath": "fsharp.core.10.0.101.nupkg.sha512"
+      "sha512": "sha512-Kuz3sl1zCKjw9RrRUPwgxkK/EP0IapRFMKG3Mcmvh6MSQw1MQGHz9VxqwpG1qBy1tdgVv907QnvucvbE+bBLUg==",
+      "path": "fsharp.core/10.0.100",
+      "hashPath": "fsharp.core.10.0.100.nupkg.sha512"
     },
     "HarfBuzzSharp/8.3.1.1": {
       "type": "package",

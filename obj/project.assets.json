@@ -325,7 +325,7 @@
           }
         }
       },
-      "FSharp.Core/10.0.101": {
+      "FSharp.Core/10.0.100": {
         "type": "package",
         "compile": {
           "lib/netstandard2.1/FSharp.Core.dll": {
@@ -1048,15 +1048,14 @@
         "lib/netstandard2.0/Avalonia.X11.xml"
       ]
     },
-    "FSharp.Core/10.0.101": {
-      "sha512": "mrS3J7cLtvXM3u3CmiaFq8oyBdlevzZY1VAAAbFk1gUDQtDEjUOybN5XpQglx5wAgJ0wLdDl6OSSfS7ZDFNcpA==",
+    "FSharp.Core/10.0.100": {
+      "sha512": "Kuz3sl1zCKjw9RrRUPwgxkK/EP0IapRFMKG3Mcmvh6MSQw1MQGHz9VxqwpG1qBy1tdgVv907QnvucvbE+bBLUg==",
       "type": "package",
-      "path": "fsharp.core/10.0.101",
+      "path": "fsharp.core/10.0.100",
       "files": [
         ".nupkg.metadata",
-        ".signature.p7s",
         "Icon.png",
-        "fsharp.core.10.0.101.nupkg.sha512",
+        "fsharp.core.10.0.100.nupkg.sha512",
         "fsharp.core.nuspec",
         "lib/netstandard2.0/FSharp.Core.dll",
         "lib/netstandard2.0/FSharp.Core.xml",
@@ -1462,36 +1461,29 @@
       "Avalonia.Diagnostics >= 11.3.9",
       "Avalonia.Fonts.Inter >= 11.3.9",
       "Avalonia.Themes.Fluent >= 11.3.9",
-      "FSharp.Core >= 10.0.101"
+      "FSharp.Core >= 10.0.100"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\hp\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "/home/mahmoud/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\hp\\Videos\\pl3\\CinemaSeatBooking.fsproj",
+      "projectUniqueName": "/mnt/NewVolume/Projects/CinemaSeatBooking/CinemaSeatBooking.fsproj",
       "projectName": "CinemaSeatBooking",
-      "projectPath": "C:\\Users\\hp\\Videos\\pl3\\CinemaSeatBooking.fsproj",
-      "packagesPath": "C:\\Users\\hp\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\hp\\Videos\\pl3\\obj\\",
+      "projectPath": "/mnt/NewVolume/Projects/CinemaSeatBooking/CinemaSeatBooking.fsproj",
+      "packagesPath": "/home/mahmoud/.nuget/packages/",
+      "outputPath": "/mnt/NewVolume/Projects/CinemaSeatBooking/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\hp\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/home/mahmoud/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-        "C:\\Program Files\\dotnet\\sdk\\10.0.101\\FSharp\\library-packs": {},
+        "/usr/share/dotnet/sdk/10.0.100/FSharp/library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -1539,7 +1531,7 @@
           "FSharp.Core": {
             "include": "Runtime, Compile, Build, Native, Analyzers, BuildTransitive",
             "target": "Package",
-            "version": "[10.0.101, )",
+            "version": "[10.0.100, )",
             "generatePathProperty": true
           }
         },
@@ -1554,12 +1546,18 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[10.0.0, 10.0.0]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.100/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",
