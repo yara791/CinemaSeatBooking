@@ -172,3 +172,6 @@
 /mnt/NewVolume/Projects/CinemaSeatBooking/obj/Debug/net9.0/CinemaSeatBooking.pdb
 /mnt/NewVolume/Projects/CinemaSeatBooking/obj/Debug/net9.0/CinemaSeatBooking.genruntimeconfig.cache
 /mnt/NewVolume/Projects/CinemaSeatBooking/obj/Debug/net9.0/ref/CinemaSeatBooking.dll
+C:\Users\hp\Videos\pl3\obj\Debug\net9.0\CinemaSeatBooking.dll
+C:\Users\hp\Videos\pl3\obj\Debug\net9.0\refint\CinemaSeatBooking.dll
+C:\Users\hp\Videos\pl3\obj\Debug\net9.0\CinemaSeatBooking.pdb

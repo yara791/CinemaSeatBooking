@@ -1,0 +1,3 @@
+Grid ID: 2x2 | Ticket ID: 09d0c863-df4b-4b6a-9f9f-44dcbd5be3fc | Created At: 2025-12-10 21:04:55
+Seat: Row 1, Col 1
+--------------------------------------------------
