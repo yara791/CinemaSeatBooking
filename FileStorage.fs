@@ -7,14 +7,14 @@ module BookingLogic =
     open System.Text.Json
     open System.Text.Json.Serialization
 
-    // ≈⁄œ«œ«  JSON ··Õ›Ÿ Ê«· Õ„Ì·
+    // JSON 
     let private jsonOptions = 
         let options = JsonSerializerOptions()
         options.WriteIndented <- true
         options.Converters.Add(JsonFSharpConverter())
         options
 
-    // Õ›Ÿ «·»Ì«‰«  ›Ì „·› JSON
+    // JSON
     let saveToFile (filePath: string) (state: CinemaState) =
         try
             let json = JsonSerializer.Serialize(state, jsonOptions)
@@ -23,7 +23,7 @@ module BookingLogic =
         with
         | ex -> Error $"Failed to save file: {ex.Message}"
 
-    //  Õ„Ì· «·»Ì«‰«  „‰ „·› JSON
+    // JSON
     let loadFromFile (filePath: string) =
         try
             if File.Exists(filePath) then
@@ -35,7 +35,7 @@ module BookingLogic =
         with
         | ex -> Error $"Failed to load file: {ex.Message}"
 
-    // Õ–› „·› «·»Ì«‰« 
+    
     let deleteFile (filePath: string) =
         try
             if File.Exists(filePath) then
@@ -46,11 +46,11 @@ module BookingLogic =
         with
         | ex -> Error $"Failed to delete file: {ex.Message}"
 
-    // «· Õﬁﬁ „‰ ÊÃÊœ «·„·›
+    
     let fileExists (filePath: string) =
         File.Exists(filePath)
 
-    // Õ›Ÿ ‰”Œ… «Õ Ì«ÿÌ…
+   
     let createBackup (filePath: string) =
         try
             if File.Exists(filePath) then

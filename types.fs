@@ -17,7 +17,7 @@ type Seat = {
 // التيكت
 type Ticket = { 
     Id: Guid
-    GridId: string  // Special ID representing the grid configuration (e.g., "5x10")
+    GridId: string  // Special ID representing the grid configuration
     Seats: Seat list
     CreatedAt: DateTime 
 }
@@ -39,7 +39,3 @@ type ApiResponse<'T> = {
     Data: 'T option
     Error: string option
 }
-
-
-
-

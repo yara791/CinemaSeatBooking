@@ -9,7 +9,7 @@ module ApiIntegration =
     // Thread-safe lock for API operations
     let private apiLock = obj()
 
-    // ������ �� ��� �����
+    // API: - Thread-safe
     let validateRequest (request: ReserveRequest) =
         if request.SeatPositions.IsEmpty then
             Error "Seat positions cannot be empty"
@@ -18,7 +18,7 @@ module ApiIntegration =
         else
             Ok request
 
-    // API: ������ ��� ���� ������� - Thread-safe
+    // API: - Thread-safe
     let getSeatsApi (state: CinemaState) =
         lock apiLock (fun () ->
             {
@@ -58,7 +58,7 @@ module ApiIntegration =
                     }
         )
 
-    // API: ������ ��� ����� ����� - Thread-safe
+    // API: - Thread-safe
     let getTicketApi (ticketId: Guid) (state: CinemaState) =
         lock apiLock (fun () ->
             match state.Tickets |> List.tryFind (fun t -> t.Id = ticketId) with
@@ -76,7 +76,7 @@ module ApiIntegration =
                 }
         )
 
-    // API: ������ ��� ���� ������� - Thread-safe
+    // API: - Thread-safe
     let getAllTicketsApi (state: CinemaState) =
         lock apiLock (fun () ->
             {
@@ -86,7 +86,7 @@ module ApiIntegration =
             }
         )
 
-    // API: ����� ��� - Thread-safe
+    // API: - Thread-safe
     let deleteTicketApi (ticketId: Guid) (state: CinemaState) =
         lock apiLock (fun () ->
             match BookingLogic.cancelReservation ticketId state with
@@ -104,7 +104,7 @@ module ApiIntegration =
                 }
         )
 
-    // API: �������� ������� - Thread-safe
+    // API: - Thread-safe
     let getStatsApi (state: CinemaState) =
         lock apiLock (fun () ->
             let availableCount = state.Seats |> List.filter (fun s -> s.Status = Available) |> List.length

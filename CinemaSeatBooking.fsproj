@@ -12,9 +12,9 @@
 		<Compile Include="SeatManagement.fs" />
 		<Compile Include="BookingLogic.fs" />
 		<Compile Include="ApiIntegration.fs" />
-		<Compile Include="SeatMapWindow.axaml.fs" />
-		<Compile Include="MainWindow.axaml.fs" />
-		<Compile Include="App.axaml.fs" />
+		<Compile Include="GUI\SeatMapWindow.axaml.fs" />
+		<Compile Include="GUI\MainWindow.axaml.fs" />
+		<Compile Include="GUI\App.axaml.fs" />
 		<Compile Include="Program.fs" />
 
 	</ItemGroup>

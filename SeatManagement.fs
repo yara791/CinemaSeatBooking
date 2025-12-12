@@ -46,7 +46,7 @@ module SeatManagement =
                 | None -> false)
         )
 
-    // عرض خريطة الكراسي (اختياري)
+    // عرض خريطة الكراسي 
     let displaySeatMap seats rows cols =
         printfn "\n=== Seat Map ==="
         printfn "Legend: [A] = Available, [R] = Reserved\n"

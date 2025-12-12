@@ -35,10 +35,10 @@ module BookingLogic =
                 Ok updated
         )
 
-    // إنشاء GUID
+    // GUID
     let generateTicketId() = Guid.NewGuid()
 
-    // إنشاء تيكت - Thread-safe version
+    // - Thread-safe version
     let createTicket gridId seatPositions seats =
         lock bookingLock (fun () ->
             match reserveSeats seatPositions seats with
